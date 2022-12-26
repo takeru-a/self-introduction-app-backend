@@ -1,0 +1,12 @@
+version: '3.8'
+services:
+  app:
+    container_name: self_introduction_backend
+    build:
+      context: .
+      dockerfile: ./docker/app/Dockerfile
+    ports:
+     - "8080:8080"
+    volumes:
+     - ./src/:/go/src
+    tty: true
