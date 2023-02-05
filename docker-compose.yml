@@ -1,12 +1,37 @@
-version: '3.8'
+version: '3'
 services:
   app:
     container_name: self_introduction_backend
     build:
       context: .
       dockerfile: ./docker/app/Dockerfile
+    env_file:
+      - .env  
+    environment:
+      - MONGODB_URI=${MONGODB_LOCAL_URI}
     ports:
      - "8080:8080"
     volumes:
      - ./src/:/go/src
     tty: true
+    depends_on:
+      - mongo
+  mongo:
+    container_name: mongo
+    image: mongo
+    restart: always
+    env_file:
+      - .env
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGODB_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE}
+      TZ: Asia/Tokyo
+    ports:
+      - 27017:27017
+    volumes:
+      - ./mongo/data:/data/db
+      - ./mongo/configdb:/data/configdb
+      - ./mongo/initdb.d:/docker-entrypoint-initdb.d
+volumes:
+  mongodb:      

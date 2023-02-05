@@ -5,7 +5,7 @@ COPY ./src .
 RUN apk upgrade --update && \
     apk --no-cache add git
 RUN go install github.com/cosmtrek/air@latest  
-RUN go mod download
+# RUN go mod download
 RUN go mod tidy
 
 

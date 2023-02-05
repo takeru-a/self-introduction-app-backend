@@ -1,0 +1,14 @@
+[
+    {
+        "sampleDate": "2023-01-01 12:00:00",
+        "username": "sample_user_001"
+    },
+    {
+        "sampleDate": "2023-01-02 11:00:00",
+        "username": "sample_user_002"
+    },
+    {
+        "sampleDate": "2023-01-03 10:00:00",
+        "username": "sample_user_003"
+    }
+]

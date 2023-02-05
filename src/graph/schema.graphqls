@@ -1,0 +1,48 @@
+# GraphQL schema example
+#
+# https://gqlgen.com/getting-started/
+
+type Room {
+  id: ID!
+  host: User!
+  token: String!
+  players: [User!]!
+}
+
+type User {
+  id: ID!
+  name: String!
+  answer: String!
+  score: Int!
+}
+
+input FetchUser {
+  id: String!
+}
+
+input FetchRoom {
+  id: String!
+}
+
+
+input NewRoom {
+  host_name: String!
+  token: String!
+}
+
+input NewUser{
+  name: String!
+}
+
+type Query {
+  users: [User!]!
+  rooms: [Room!]!
+  user(input: FetchUser): User!
+  room(input: FetchRoom): Room!
+}
+
+
+type Mutation {
+  createRoom(input: NewRoom!):Room!
+  createUser(input: NewUser!):User!
+}
