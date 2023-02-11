@@ -27,7 +27,7 @@ input FetchRoom {
 
 input NewRoom {
   host_name: String!
-  token: String!
+
 }
 
 input NewUser{

@@ -4,12 +4,17 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math/rand"
 	"time"
-    "go.mongodb.org/mongo-driver/bson"
-    "go.mongodb.org/mongo-driver/bson/primitive"
 	"github.com/takeru-a/self-introduction-app-backend/graph/model"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+    "github.com/golang-jwt/jwt"
+    "github.com/gorilla/sessions"
+	"github.com/labstack/echo/v4"
+
 )
 
 type DB struct {
@@ -43,7 +48,17 @@ func GetCollection(db *DB, collectionName string) *mongo.Collection {
     return collection
 }
 
-func (db *DB) CreateRoom(input *model.NewRoom) (*model.Room, error){
+func GenerateToken(n int) string {
+    var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+
+    b := make([]rune, n)
+    for i := range b {
+        b[i] = letterRunes[rand.Intn(len(letterRunes))]
+    }
+    return string(b)
+}
+
+func (db *DB) CreateRoom(input *model.NewRoom, eC echo.Context) (*model.Room, error){
     RoomCollection := GetCollection(db, "room")
     UserCollection := GetCollection(db, "user")
     ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -57,7 +72,7 @@ func (db *DB) CreateRoom(input *model.NewRoom) (*model.Room, error){
 	room := &model.Room{
         ID: primitive.NewObjectID().Hex(),
 		Host: host,
-		Token: input.Token,
+		Token: GenerateToken(32),
 		Players: []*model.User{host},
 	}
     _, err := RoomCollection.InsertOne(ctx, room)
@@ -68,10 +83,29 @@ func (db *DB) CreateRoom(input *model.NewRoom) (*model.Room, error){
     if err != nil {
         return nil, err
     }
+    session := getSession(eC)
+    session.Values["username"] = host.Name
+    session.Values["auth"] = true                                       // ログイン有無の確認用
+    if err := sessions.Save(eC.Request(), eC.Response()); err != nil {  // Session情報の保存
+        log.Fatal("Failed save session", err)
+    }
+    claims := JWTCustomClaims{
+		host.ID,
+		host.Name,
+		jwt.StandardClaims{
+            ExpiresAt: time.Now().Add(time.Hour * 1).Unix(),
+        },
+    }
+    token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+    t, err := token.SignedString(signingKey)
+    if err != nil{
+        return nil, err
+    }
+    session.Values["token"] = t
     return room, err
 }
 
-func (db *DB) CreateUser(input *model.NewUser) (*model.User, error) {
+func (db *DB) CreateUser(input *model.NewUser, eC echo.Context) (*model.User, error) {
     collection := GetCollection(db, "user")
     ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
     defer cancel()
@@ -87,6 +121,25 @@ func (db *DB) CreateUser(input *model.NewUser) (*model.User, error) {
     if err != nil {
         return nil, err
     }
+    session := getSession(eC)
+    session.Values["username"] = user.Name
+    session.Values["auth"] = true                                       // ログイン有無の確認用
+    if err := sessions.Save(eC.Request(), eC.Response()); err != nil {  // Session情報の保存
+        log.Fatal("Failed save session", err)
+    }
+    claims := &JWTCustomClaims{
+        user.ID,
+        user.Name,
+        jwt.StandardClaims{
+            ExpiresAt: time.Now().Add(time.Hour * 1).Unix(),
+        },
+    }
+    token := jwt.NewWithClaims(jwt.SigningMethodES256, claims)
+    t, err := token.SignedString(signingKey)
+    if err != nil{
+        return nil, err
+    }
+    session.Values["token"] = t
     return user, err
 }
 

@@ -6,23 +6,29 @@ package graph
 
 import (
 	"context"
+	"fmt"
+	"github.com/labstack/echo/v4"
 	"github.com/takeru-a/self-introduction-app-backend/configs"
 	"github.com/takeru-a/self-introduction-app-backend/graph/model"
 )
 
-var (
-	db = configs.ConnectDB()
-)
-
 // CreateRoom is the resolver for the createRoom field.
 func (r *mutationResolver) CreateRoom(ctx context.Context, input model.NewRoom) (*model.Room, error) {
-	room, err := db.CreateRoom(&input)
+	eC, err := EchoContextFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	room, err := db.CreateRoom(&input, eC)
 	return room, err
 }
 
 // CreateUser is the resolver for the createUser field.
 func (r *mutationResolver) CreateUser(ctx context.Context, input model.NewUser) (*model.User, error) {
-	user, err := db.CreateUser(&input)
+	eC, err := EchoContextFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	user, err := db.CreateUser(&input,eC)
 	return user, err
 }
 
@@ -58,3 +64,41 @@ func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
 
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
+
+// !!! WARNING !!!
+// The code below was going to be deleted when updating resolvers. It has been copied here so you have
+// one last chance to move it out of harms way if you want. There are two reasons this happens:
+//   - When renaming or deleting a resolver the old code will be put in here. You can safely delete
+//     it when you're done.
+//   - You have helper methods in this file. Move them out to keep these resolver files clean.
+var (
+	db = configs.ConnectDB()
+)
+
+type EchoContextKey struct {
+	name string
+}
+
+var UserCtxKey = &EchoContextKey{"UserCtxKey"}
+
+func EchoContextFromContext(ctx context.Context) (echo.Context, error) {
+	echoContext := ctx.Value(UserCtxKey)
+	if echoContext == nil {
+		err := fmt.Errorf("could not retrieve echo.Context")
+		return nil, err
+	}
+
+	ec, ok := echoContext.(echo.Context)
+	if !ok {
+		err := fmt.Errorf("echo.Context has wrong type")
+		return nil, err
+	}
+	return ec, nil
+}
+func BindContext(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		ctx := context.WithValue(c.Request().Context(), UserCtxKey, c)
+		c.SetRequest(c.Request().WithContext(ctx))
+		return next(c)
+	}
+}

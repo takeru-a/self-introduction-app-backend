@@ -8,6 +8,8 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/takeru-a/self-introduction-app-backend/configs"
 	"github.com/takeru-a/self-introduction-app-backend/graph"
+	"github.com/gorilla/sessions"
+    "github.com/labstack/echo-contrib/session"
 )
 
 func main() {
@@ -15,12 +17,15 @@ func main() {
 	 // ミドルウェアを設定
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
+	e.Use(graph.BindContext)
+	e.Use(session.Middleware(sessions.NewCookieStore([]byte(configs.GetSIGNING_KEY()))))
 	e.Use(middleware.CORSWithConfig(
         middleware.CORSConfig{
 			AllowCredentials: true,
             // Origin
 			AllowOrigins: []string{
 				"http://localhost:3000",
+				"http://localhost:8080",
 			},
         }),
 	)
@@ -39,5 +44,6 @@ func main() {
 	e.GET("/",func(c echo.Context) error {
 		return c.JSON(http.StatusOK, "{msg : hello!}")
 	})
+	e.GET("/logout",configs.Logout)
 	e.Logger.Fatal(e.Start(":8080"))
 }

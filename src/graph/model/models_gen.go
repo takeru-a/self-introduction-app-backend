@@ -3,16 +3,15 @@
 package model
 
 type FetchRoom struct {
-	ID string `json:"id" bson:"_id"`
+	ID string `json:"id"`
 }
 
 type FetchUser struct {
-	ID string `json:"id" bson:"_id"`
+	ID string `json:"id"`
 }
 
 type NewRoom struct {
 	HostName string `json:"host_name"`
-	Token    string `json:"token"`
 }
 
 type NewUser struct {
@@ -20,14 +19,14 @@ type NewUser struct {
 }
 
 type Room struct {
-	ID      string  `json:"_id" bson:"_id"`
+	ID      string  `json:"id"`
 	Host    *User   `json:"host"`
 	Token   string  `json:"token"`
 	Players []*User `json:"players"`
 }
 
 type User struct {
-	ID     string `json:"_id" bson:"_id"`
+	ID     string `json:"id"`
 	Name   string `json:"name"`
 	Answer string `json:"answer"`
 	Score  int    `json:"score"`
