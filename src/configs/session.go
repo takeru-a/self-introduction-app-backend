@@ -10,6 +10,7 @@ import(
     "github.com/labstack/echo/v4/middleware"
     "github.com/labstack/gommon/log"
     "github.com/rbcervilla/redisstore/v8"
+    "github.com/takeru-a/self-introduction-app-backend/graph/model"
 
 )
 
@@ -56,6 +57,7 @@ func getSession(c echo.Context) *sessions.Session {
     }
     store.KeyPrefix("session_")
     store.Options(sessions.Options{
+        Path: "/",
         MaxAge:   600,
         HttpOnly: true,
     })
@@ -80,13 +82,27 @@ func Logout(c echo.Context) error {
 }
 
 //  ログイン済みユーザに表示する
-func ShowPage(c echo.Context) error {
+func ShowPageData(c echo.Context) *model.LoginedUser {
     session := getSession(c)
     // ログイン確認
     if session.Values["auth"] != true {
-        return c.String(http.StatusUnauthorized, "401")
+        logedUser := &model.LoginedUser{
+            Name: "",
+            RoomID: "",
+            UserID: "",
+            RoomToken: "",
+            Code: http.StatusUnauthorized,
+        }
+        return logedUser
     } else {
-        return c.String(http.StatusOK, session.Values["username"].(string))
+        logedUser := &model.LoginedUser{
+            Name: session.Values["username"].(string),
+            RoomID: session.Values["room_id"].(string),
+            RoomToken: session.Values["room_token"].(string),
+            UserID: session.Values["user_id"].(string),
+            Code: http.StatusOK,
+        }
+        return logedUser
     }
 }
 

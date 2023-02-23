@@ -2,14 +2,16 @@ package main
 
 import (
 	"net/http"
+
 	"github.com/99designs/gqlgen/graphql/handler"
+	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/99designs/gqlgen/graphql/playground"
+	"github.com/gorilla/sessions"
+	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/takeru-a/self-introduction-app-backend/configs"
 	"github.com/takeru-a/self-introduction-app-backend/graph"
-	"github.com/gorilla/sessions"
-    "github.com/labstack/echo-contrib/session"
 )
 
 func main() {
@@ -25,14 +27,24 @@ func main() {
             // Origin
 			AllowOrigins: []string{
 				"http://localhost:3000",
-				"http://localhost:8080",
 			},
+			// Method
+			AllowMethods: []string{"GET","POST"},
+			// Header
+			AllowHeaders: []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept},			
         }),
 	)
+
 	configs.ConnectDB()
-	graphqlHandler  := handler.NewDefaultServer(graph.NewExecutableSchema(graph.Config{Resolvers: &graph.Resolver{}}))
+	// graphqlHandler  := handler.NewDefaultServer(graph.NewExecutableSchema(graph.Config{Resolvers: &graph.Resolver{}}))
+	graphqlHandler  := handler.NewDefaultServer(graph.NewExecutableSchema(graph.Config{Resolvers: graph.NewResolver()}))
+	graphqlHandler.AddTransport(&transport.Websocket{})
 	playgroundHandler := playground.Handler("GraphQL", "/query")
 	e.POST("/query", func(c echo.Context) error {
+		graphqlHandler.ServeHTTP(c.Response(), c.Request())
+		return nil
+	})
+	e.GET("/query", func(c echo.Context) error {
 		graphqlHandler.ServeHTTP(c.Response(), c.Request())
 		return nil
 	})
