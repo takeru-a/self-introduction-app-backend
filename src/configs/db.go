@@ -85,6 +85,9 @@ func (db *DB) CreateRoom(input *model.NewRoom, eC echo.Context) (*model.Room, er
     }
     session := getSession(eC)
     session.Values["username"] = host.Name
+    session.Values["user_id"] = host.ID
+    session.Values["room_id"] = room.ID
+    session.Values["room_token"] = room.Token
     session.Values["auth"] = true                                       // ログイン有無の確認用
     if err := sessions.Save(eC.Request(), eC.Response()); err != nil {  // Session情報の保存
         log.Fatal("Failed save session", err)
@@ -105,8 +108,10 @@ func (db *DB) CreateRoom(input *model.NewRoom, eC echo.Context) (*model.Room, er
     return room, err
 }
 
-func (db *DB) CreateUser(input *model.NewUser, eC echo.Context) (*model.User, error) {
-    collection := GetCollection(db, "user")
+func (db *DB) CreateUser(input *model.NewUser, eC echo.Context) (*model.User,*model.Room, error) {
+    Usercollection := GetCollection(db, "user")
+    Roomcollection := GetCollection(db, "room")
+    var room *model.Room
     ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
     defer cancel()
 
@@ -116,15 +121,31 @@ func (db *DB) CreateUser(input *model.NewUser, eC echo.Context) (*model.User, er
         Score: 0,
         Answer: "",
     }
-    _, err := collection.InsertOne(ctx, user)
-
+    _, err := Usercollection.InsertOne(ctx, user)
     if err != nil {
-        return nil, err
+        return nil, nil,err
+    }
+    err = Roomcollection.FindOne(ctx, bson.M{"token": input.Token}).Decode(&room)
+    if err != nil {
+        return nil, nil, err
+    }
+    update := bson.M{"players": user}
+    _, err = Roomcollection.UpdateOne(ctx, 
+        bson.M{"id": room.ID},
+        bson.M{
+        "$push": update,
+        },
+    )
+    if err != nil {
+        return nil, nil, err
     }
     session := getSession(eC)
+    session.Values["user_id"] = user.ID      
     session.Values["username"] = user.Name
-    session.Values["auth"] = true                                       // ログイン有無の確認用
-    if err := sessions.Save(eC.Request(), eC.Response()); err != nil {  // Session情報の保存
+    session.Values["room_id"] = room.ID
+    session.Values["room_token"] = input.Token
+    session.Values["auth"] = true                                     
+    if err := sessions.Save(eC.Request(), eC.Response()); err != nil { 
         log.Fatal("Failed save session", err)
     }
     claims := &JWTCustomClaims{
@@ -134,13 +155,17 @@ func (db *DB) CreateUser(input *model.NewUser, eC echo.Context) (*model.User, er
             ExpiresAt: time.Now().Add(time.Hour * 1).Unix(),
         },
     }
-    token := jwt.NewWithClaims(jwt.SigningMethodES256, claims)
+    token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
     t, err := token.SignedString(signingKey)
     if err != nil{
-        return nil, err
+        return nil, nil, err
     }
     session.Values["token"] = t
-    return user, err
+    err = Roomcollection.FindOne(ctx, bson.M{"token": input.Token}).Decode(&room)
+    if err != nil {
+        return nil, nil, err
+    }
+    return user, room, err
 }
 
 func (db *DB) GetUses() ([]*model.User, error) {
@@ -197,9 +222,9 @@ func (db *DB) SingleUser(ID string) (*model.User, error) {
     var user *model.User
     defer cancel()
 
-    objId, _ := primitive.ObjectIDFromHex(ID)
+    // objId, _ := primitive.ObjectIDFromHex(ID)
 
-    err := collection.FindOne(ctx, bson.M{"_id": objId}).Decode(&user)
+    err := collection.FindOne(ctx, bson.M{"id": ID}).Decode(&user)
 
     return user, err
 }
@@ -210,9 +235,9 @@ func (db *DB) SingleRoom(ID string) (*model.Room, error) {
     var room *model.Room
     defer cancel()
 
-    objId, _ := primitive.ObjectIDFromHex(ID)
+    // objId, _ := primitive.ObjectIDFromHex(ID)
 
-    err := collection.FindOne(ctx, bson.M{"_id": objId}).Decode(&room)
+    err := collection.FindOne(ctx, bson.M{"id": ID}).Decode(&room)
 
     return room, err
 }

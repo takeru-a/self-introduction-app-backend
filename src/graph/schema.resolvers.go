@@ -7,7 +7,9 @@ package graph
 import (
 	"context"
 	"fmt"
-	"github.com/labstack/echo/v4"
+	"log"
+
+	echo "github.com/labstack/echo/v4"
 	"github.com/takeru-a/self-introduction-app-backend/configs"
 	"github.com/takeru-a/self-introduction-app-backend/graph/model"
 )
@@ -28,7 +30,14 @@ func (r *mutationResolver) CreateUser(ctx context.Context, input model.NewUser) 
 	if err != nil {
 		return nil, err
 	}
-	user, err := db.CreateUser(&input,eC)
+	user, room, err := db.CreateUser(&input, eC)
+	r.mutex.Lock()
+	for keys, ch := range r.subscribers {
+		if (keys.token == room.Token){
+			ch <- room
+		}
+	}
+	r.mutex.Unlock()
 	return user, err
 }
 
@@ -56,14 +65,55 @@ func (r *queryResolver) Room(ctx context.Context, input *model.FetchRoom) (*mode
 	return room, err
 }
 
+// LoginedUser is the resolver for the loginedUser field.
+func (r *queryResolver) LoginedUser(ctx context.Context) (*model.LoginedUser, error) {
+	eC, err := EchoContextFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result := configs.ShowPageData(eC)
+
+	return result, err
+}
+
+// ChangeRoom is the resolver for the changeRoom field.
+func (r *subscriptionResolver) ChangeRoom(ctx context.Context, input model.Subscriber) (<-chan *model.Room, error) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	if _, ok := r.subscribers[Keys{input.Token, input.UserID}]; ok {
+		err := fmt.Errorf("`%s` has already been subscribed.", Keys{input.Token, input.UserID})
+		log.Print(err.Error())
+		return nil, err
+	}
+	// チャンネルを作成し、リストに登録
+	ch := make(chan *model.Room, 1)
+	r.subscribers[Keys{input.Token, input.UserID}] = ch
+	log.Printf("`%s` has been subscribed!", Keys{input.Token, input.UserID})
+	// コネクションが終了したら、このチャンネルを削除する
+	go func() {
+		<-ctx.Done()
+		r.mutex.Lock()
+		delete(r.subscribers,Keys{input.Token, input.UserID})
+		r.mutex.Unlock()
+		log.Printf("`%s` has been unsubscribed.", Keys{input.Token, input.UserID})
+	}()
+
+	return ch, nil
+}
+
 // Mutation returns MutationResolver implementation.
 func (r *Resolver) Mutation() MutationResolver { return &mutationResolver{r} }
 
 // Query returns QueryResolver implementation.
 func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
 
+// Subscription returns SubscriptionResolver implementation.
+func (r *Resolver) Subscription() SubscriptionResolver { return &subscriptionResolver{r} }
+
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
+type subscriptionResolver struct{ *Resolver }
 
 // !!! WARNING !!!
 // The code below was going to be deleted when updating resolvers. It has been copied here so you have

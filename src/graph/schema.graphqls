@@ -16,6 +16,14 @@ type User {
   score: Int!
 }
 
+type LoginedUser{
+  userId: String!
+  name: String!
+  roomId: String!
+  roomToken: String!
+  code: Int!
+}
+
 input FetchUser {
   id: String!
 }
@@ -32,6 +40,12 @@ input NewRoom {
 
 input NewUser{
   name: String!
+  token: String!
+}
+
+input Subscriber{
+  token: String!
+  userId: String!
 }
 
 type Query {
@@ -39,10 +53,15 @@ type Query {
   rooms: [Room!]!
   user(input: FetchUser): User!
   room(input: FetchRoom): Room!
+  loginedUser: LoginedUser!
 }
 
 
 type Mutation {
   createRoom(input: NewRoom!):Room!
   createUser(input: NewUser!):User!
+}
+
+type Subscription {
+  changeRoom(input: Subscriber!):Room!
 }
