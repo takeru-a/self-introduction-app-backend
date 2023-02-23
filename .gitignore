@@ -1,4 +1,5 @@
 /.env
 /src/.env
-/mongo/data/*
-/redis/data/*
+/redis/data/
+/mongo/data/
+/src/tmp/
